@@ -19,7 +19,7 @@ import org.nrg.containers.model.Image;
 import org.nrg.containers.services.ContainerService;
 import org.nrg.prefs.exceptions.InvalidPreferenceName;
 import org.nrg.transporter.TransportService;
-import org.nrg.xft.XFT;
+import org.nrg.xdat.preferences.SiteConfigPreferences;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -56,6 +56,10 @@ public class DefaultContainerService implements ContainerService {
     @Autowired
     @SuppressWarnings("SpringJavaAutowiringInspection") // IntelliJ does not process the excludeFilter in ContainerServiceConfig @ComponentScan, erroneously marks this red
     private ContainerHubPrefs containerHubPrefs;
+
+    @Autowired
+    @SuppressWarnings("SpringJavaAutowiringInspection") // IntelliJ does not process the excludeFilter in ContainerServiceConfig @ComponentScan, erroneously marks this red
+    private SiteConfigPreferences preferences;
 
     public List<Image> getAllImages() throws NoServerPrefException, ContainerServerException {
         return controlApi.getAllImages();
@@ -177,7 +181,7 @@ public class DefaultContainerService implements ContainerService {
         final Calendar cal = Calendar.getInstance();
         final SimpleDateFormat formatter = new SimpleDateFormat("yyyyMMdd_HHmmss");
         final String timestamp = formatter.format(cal.getTime());
-        final String buildDir = XFT.getBuildPath() + timestamp;
+        final String buildDir = preferences.getBuildPath() + timestamp;
 
         final String filename = "script";
         final File filenameWithPath = new File(buildDir, filename);

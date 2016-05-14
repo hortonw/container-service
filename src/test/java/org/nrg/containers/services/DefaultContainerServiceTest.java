@@ -362,6 +362,6 @@ public class DefaultContainerServiceTest {
         when(mockPrefsService.getPreferenceValue(CONTAINER_HUB_PREF_ID, CONTAINER_HUB_PREF_ID + "."))
             .thenReturn("{'url':'https://index.docker.io/v1/','name':'Docker Hub'," +
                 "'username':'','password':'','email':''}");
-        containerHubPrefs.initialize(mockPrefsService);
+        containerHubPrefs.initialize();
     }
 }

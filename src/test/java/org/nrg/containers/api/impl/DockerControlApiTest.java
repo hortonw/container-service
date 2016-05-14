@@ -84,7 +84,7 @@ public class DockerControlApiTest {
         when(mockPrefsService.hasPreference("container-server", "certPath"))
             .thenReturn(true);
 
-        containerServerPrefsBean.initialize(mockPrefsService);
+        containerServerPrefsBean.initialize();
 
         client = controlApi.getClient();
     }
