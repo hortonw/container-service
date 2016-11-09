@@ -312,4 +312,18 @@ public class HibernateContainerExecutionService
         final ContainerExecution execution = new ContainerExecution(resolvedCommand, containerId, userI.getLogin());
         return create(execution);
     }
+
+    @Override
+    @Transactional
+    public String getStatus(final Long containerExecutionId, final UserI userI) {
+        final ContainerExecution execution = retrieve(containerExecutionId);
+        String containerStatus = "";
+        try {
+            containerStatus  = containerControlApi.getContainerStdoutLog(execution.getContainerId());
+        } catch (DockerServerException | NoServerPrefException e) {
+            log.error("Could not get container status for container with id " + execution.getContainerId(), e);
+        }
+        return containerStatus;
+    }
+
 }

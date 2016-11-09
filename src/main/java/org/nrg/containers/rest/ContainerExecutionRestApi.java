@@ -1,5 +1,8 @@
 package org.nrg.containers.rest;
 
+import io.swagger.annotations.ApiOperation;
+import io.swagger.annotations.ApiResponse;
+import io.swagger.annotations.ApiResponses;
 import org.nrg.containers.exceptions.NotFoundException;
 import org.nrg.containers.model.ContainerExecution;
 import org.nrg.containers.services.ContainerExecutionService;
@@ -59,4 +62,13 @@ public class ContainerExecutionRestApi {
         final UserI userI = XDAT.getUserDetails();
         containerExecutionService.finalize(id, userI);
     }
+
+    @RequestMapping(value = "/{id}", method = GET)
+    @ResponseBody
+    public ResponseEntity<String> status(final @PathVariable Long id) throws NotFoundException {
+        final UserI userI = XDAT.getUserDetails();
+        String status = containerExecutionService.getStatus(id, userI);
+        return new ResponseEntity<>(status, HttpStatus.OK);
+    }
+
 }

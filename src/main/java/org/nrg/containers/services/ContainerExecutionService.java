@@ -15,4 +15,5 @@ public interface ContainerExecutionService extends BaseHibernateService<Containe
     ContainerExecution save(final ResolvedCommand resolvedCommand,
                             final String containerId,
                             final UserI userI);
+    String getStatus(final Long containerExecutionId, final UserI userI);
 }
