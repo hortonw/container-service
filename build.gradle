@@ -46,7 +46,7 @@ dependencies {
         transitive = false
     }
     compileAndInclude "io.rest-assured:rest-assured:3.0.1"
-    compileAndInclude (group: 'com.spotify', name: 'docker-client', version: 'latest.release') {
+    compileAndInclude (group: 'com.spotify', name: 'docker-client', version: '6.1.2-SNAPSHOT') {
         exclude group: "ch.qos.logback"
     }
     compileAndInclude "com.jayway.jsonpath:json-path:2.2.0"
