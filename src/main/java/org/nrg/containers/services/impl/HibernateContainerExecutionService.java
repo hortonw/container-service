@@ -11,7 +11,6 @@ import org.nrg.containers.exceptions.NoServerPrefException;
 import org.nrg.containers.exceptions.NotFoundException;
 import org.nrg.containers.helpers.ContainerFinalizeHelper;
 import org.nrg.containers.model.ContainerExecution;
-import org.nrg.containers.model.ContainerExecutionHistory;
 import org.nrg.containers.model.ResolvedCommand;
 import org.nrg.containers.services.ContainerExecutionService;
 import org.nrg.framework.orm.hibernate.AbstractHibernateEntityService;
@@ -30,7 +29,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
-import java.util.List;
 
 @Service
 public class HibernateContainerExecutionService
@@ -82,21 +80,11 @@ public class HibernateContainerExecutionService
         if (log.isDebugEnabled()) {
             log.debug("Processing docker container event: " + event);
         }
-        final List<ContainerExecution> matchingContainerIds = getDao().findByProperty("containerId", event.getContainerId());
+        final ContainerExecution execution = getDao().didRecordEvent(event);
 
-        // Container ID is constrained to be unique, so we can safely take the first element of this list
-        if (matchingContainerIds != null && !matchingContainerIds.isEmpty()) {
-            final ContainerExecution execution = matchingContainerIds.get(0);
-            if (log.isDebugEnabled()) {
-                log.debug("Found matching execution: " + execution.getId());
-            }
-
-            final ContainerExecutionHistory history = new ContainerExecutionHistory(event.getStatus(), event.getTime());
-            if (log.isDebugEnabled()) {
-                log.debug("Adding history entry: " + history);
-            }
-            execution.addToHistory(history);
-            update(execution);
+        // execution will be null if either we aren't tracking the container
+        // that this event is about, or if we have already recorded the event
+        if (execution != null ) {
 
             if (StringUtils.isNotBlank(event.getStatus()) &&
                     event.getStatus().matches("kill|die|oom")) {

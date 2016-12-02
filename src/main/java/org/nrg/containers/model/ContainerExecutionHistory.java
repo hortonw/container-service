@@ -8,13 +8,13 @@ import java.util.Date;
 @Embeddable
 public class ContainerExecutionHistory {
     private String status;
-    private Date time;
+    private Long timeNano;
 
     public ContainerExecutionHistory() {}
 
-    public ContainerExecutionHistory(final String status, final Date time) {
+    public ContainerExecutionHistory(final String status, final Long timeNano) {
         this.status = status;
-        this.time = time;
+        this.timeNano = timeNano;
     }
 
     public String getStatus() {
@@ -25,19 +25,19 @@ public class ContainerExecutionHistory {
         this.status = status;
     }
 
-    public Date getTime() {
-        return time;
+    public Long getTimeNano() {
+        return timeNano;
     }
 
-    public void setTime(final Date time) {
-        this.time = time;
+    public void setTimeNano(final Long timeNano) {
+        this.timeNano = timeNano;
     }
 
     @Override
     public String toString() {
         return MoreObjects.toStringHelper(this)
                 .add("status", status)
-                .add("time", time)
+                .add("timeNano", timeNano)
                 .toString();
     }
 }
