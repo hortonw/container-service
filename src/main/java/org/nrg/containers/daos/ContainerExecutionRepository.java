@@ -1,5 +1,6 @@
 package org.nrg.containers.daos;
 
+import org.apache.commons.lang3.StringUtils;
 import org.nrg.containers.events.DockerContainerEvent;
 import org.nrg.containers.model.ContainerExecution;
 import org.nrg.containers.model.ContainerExecutionHistory;
@@ -9,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Map;
 
 @Repository
 public class ContainerExecutionRepository extends AbstractHibernateDAO<ContainerExecution> {
@@ -25,8 +27,20 @@ public class ContainerExecutionRepository extends AbstractHibernateDAO<Container
                 log.debug("Found matching execution: " + execution.getId());
             }
 
+            String status = event.getStatus();
+            if (status.matches("kill|die|oom")) {
+                final Map<String, Object> attributes = event.getAttributes();
+                final String exitCode =
+                        attributes.containsKey("exitCode") &&
+                                attributes.get("exitCode") != null &&
+                                StringUtils.isNotBlank((String)attributes.get("exitCode")) ?
+                                (String) attributes.get("exitCode") :
+                                "x";
+
+                status += "(" + exitCode + ")";
+            }
             final ContainerExecutionHistory newHistory =
-                    new ContainerExecutionHistory(event.getStatus(), event.getTimeNano());
+                    new ContainerExecutionHistory(status, event.getTimeNano());
 
             final List<ContainerExecutionHistory> historyList = execution.getHistory();
             if (historyList != null && !historyList.isEmpty()) {

@@ -1,7 +1,6 @@
 package org.nrg.containers.services.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.commons.lang3.StringUtils;
 import org.hibernate.Hibernate;
 import org.nrg.containers.api.ContainerControlApi;
 import org.nrg.containers.daos.ContainerExecutionRepository;
@@ -11,6 +10,7 @@ import org.nrg.containers.exceptions.NoServerPrefException;
 import org.nrg.containers.exceptions.NotFoundException;
 import org.nrg.containers.helpers.ContainerFinalizeHelper;
 import org.nrg.containers.model.ContainerExecution;
+import org.nrg.containers.model.ContainerExecutionHistory;
 import org.nrg.containers.model.ResolvedCommand;
 import org.nrg.containers.services.ContainerExecutionService;
 import org.nrg.framework.orm.hibernate.AbstractHibernateEntityService;
@@ -29,12 +29,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 public class HibernateContainerExecutionService
         extends AbstractHibernateEntityService<ContainerExecution, ContainerExecutionRepository>
         implements ContainerExecutionService {
     private static final Logger log = LoggerFactory.getLogger(HibernateContainerExecutionService.class);
+    private static final Pattern exitCodePattern = Pattern.compile("kill|die|oom\\((\\d+|x)\\)");
     private final String UTF8 = StandardCharsets.UTF_8.name();
 
     private ContainerControlApi containerControlApi;
@@ -86,12 +89,14 @@ public class HibernateContainerExecutionService
         // that this event is about, or if we have already recorded the event
         if (execution != null ) {
 
-            if (StringUtils.isNotBlank(event.getStatus()) &&
-                    event.getStatus().matches("kill|die|oom")) {
+            final Matcher exitCodeMatcher =
+                    exitCodePattern.matcher(event.getStatus());
+            if (exitCodeMatcher.matches()) {
+                final String exitCode = exitCodeMatcher.group(1);
                 final String userLogin = execution.getUserId();
                 try {
                     final UserI userI = Users.getUser(userLogin);
-                    finalize(execution, userI);
+                    finalize(execution, userI, exitCode);
                 } catch (UserInitException | UserNotFoundException e) {
                     log.error("Could not finalize container execution. Could not get user details for user " + userLogin, e);
                 }
@@ -104,17 +109,24 @@ public class HibernateContainerExecutionService
     @Transactional
     public void finalize(final Long containerExecutionId, final UserI userI) {
         final ContainerExecution containerExecution = retrieve(containerExecutionId);
-        finalize(containerExecution, userI);
+        String exitCode = "x";
+        for (final ContainerExecutionHistory history : containerExecution.getHistory()) {
+            final Matcher exitCodeMatcher = exitCodePattern.matcher(history.getStatus());
+            if (exitCodeMatcher.matches()) {
+                exitCode = exitCodeMatcher.group(1);
+            }
+        }
+        finalize(containerExecution, userI, exitCode);
     }
 
     @Override
     @Transactional
-    public void finalize(final ContainerExecution containerExecution, final UserI userI) {
+    public void finalize(final ContainerExecution containerExecution, final UserI userI, final String exitCode) {
         if (log.isDebugEnabled()) {
             log.debug(String.format("Finalizing ContainerExecution %s for container %s", containerExecution.getId(), containerExecution.getContainerId()));
         }
 
-        ContainerFinalizeHelper.finalizeContainer(containerExecution, userI, containerControlApi, siteConfigPreferences, transportService, permissionsService, catalogService, mapper);
+        ContainerFinalizeHelper.finalizeContainer(containerExecution, userI, exitCode, containerControlApi, siteConfigPreferences, transportService, permissionsService, catalogService, mapper);
     }
 
     @Override

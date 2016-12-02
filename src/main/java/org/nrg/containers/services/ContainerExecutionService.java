@@ -14,7 +14,7 @@ import java.util.Map;
 public interface ContainerExecutionService extends BaseHibernateService<ContainerExecution> {
     void processEvent(final DockerContainerEvent event);
     void finalize(final Long containerExecutionId, final UserI userI);
-    void finalize(final ContainerExecution containerExecution, final UserI userI);
+    void finalize(final ContainerExecution containerExecution, final UserI userI, final String exitCode);
     ContainerExecution save(final ResolvedCommand resolvedCommand,
                             final String containerId,
                             final UserI userI);
