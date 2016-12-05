@@ -202,6 +202,9 @@ public class DockerControlApiTest {
 
     @Test(timeout = 10000)
     public void testEventPolling() throws Exception {
+        final Date start = new Date();
+        Thread.sleep(1000); // Wait to ensure we get some events
+
         controlApi.pullImage(BUSYBOX_LATEST);
 
         // Create container, to ensure we have some events to read
@@ -210,10 +213,9 @@ public class DockerControlApiTest {
                 .cmd("sh", "-c", "echo Hello world")
                 .build();
 
-        final Date start = new Date();
-        Thread.sleep(1000); // Wait to ensure we get some events
         final ContainerCreation creation = client.createContainer(config);
         client.startContainer(creation.id());
+
         Thread.sleep(1000); // Wait to ensure we get some events
         final Date end = new Date();
 

@@ -9,6 +9,7 @@ import com.google.common.collect.Maps;
 import com.spotify.docker.client.DefaultDockerClient;
 import com.spotify.docker.client.DockerCertificates;
 import com.spotify.docker.client.DockerClient;
+import com.spotify.docker.client.DockerClient.EventsParam.EventType;
 import com.spotify.docker.client.DockerClient.LogsParam;
 import com.spotify.docker.client.EventStream;
 import com.spotify.docker.client.LogStream;
@@ -54,7 +55,6 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
-import static com.spotify.docker.client.DockerClient.EventsParam.EventType.CONTAINER;
 import static com.spotify.docker.client.DockerClient.EventsParam.since;
 import static com.spotify.docker.client.DockerClient.EventsParam.type;
 import static com.spotify.docker.client.DockerClient.EventsParam.until;
@@ -658,8 +658,8 @@ public class DockerControlApi implements ContainerControlApi {
             final List<Event> eventList;
             try (final EventStream eventStream =
                          client.events(since(since.getTime() / 1000),
-                                 until((until.getTime() / 1000)),
-                                 type(CONTAINER))) {
+                                 until(until.getTime() / 1000),
+                                 type(EventType.CONTAINER))) {
 
                 if (log.isDebugEnabled()) {
                     log.debug("Got a stream of docker events.");
