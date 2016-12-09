@@ -1,5 +1,6 @@
 package org.nrg.containers.helpers;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -9,14 +10,13 @@ import org.nrg.containers.api.ContainerControlApi;
 import org.nrg.containers.exceptions.ContainerException;
 import org.nrg.containers.exceptions.DockerServerException;
 import org.nrg.containers.exceptions.NoServerPrefException;
-import org.nrg.containers.model.CommandMount;
-import org.nrg.containers.model.CommandOutput;
-import org.nrg.containers.model.CommandOutputFiles;
 import org.nrg.containers.model.ContainerExecution;
 import org.nrg.containers.model.ContainerExecutionMount;
 import org.nrg.containers.model.ContainerExecutionOutput;
+import org.nrg.containers.model.xnat.Resource;
 import org.nrg.containers.model.xnat.XnatModelObject;
 import org.nrg.transporter.TransportService;
+import org.nrg.xdat.om.XnatResourcecatalog;
 import org.nrg.xdat.preferences.SiteConfigPreferences;
 import org.nrg.xdat.security.services.PermissionsServiceI;
 import org.nrg.xft.security.UserI;
@@ -146,17 +146,31 @@ public class ContainerFinalizeHelper {
 
 
         for (final ContainerExecutionOutput output: containerExecution.getOutputs()) {
+            XnatModelObject created = null;
             try {
-                uploadOutput(output);
+                created = uploadOutput(output);
             } catch (ContainerException | RuntimeException e) {
                 log.error("Cannot upload files for command output " + output.getName(), e);
+            }
+            if (created != null) {
+                try {
+                    output.setCreated(mapper.writeValueAsString(created));
+                } catch (JsonProcessingException e) {
+                    String message = String.format("Files for command output \"%s\" were uploaded and saved, but the JSON representation of the object thus created could not be recorded.", output.getName());
+                    if (log.isDebugEnabled()) {
+                        message += "\n" + created;
+                    }
+                    log.error(message, e);
+                }
+            } else {
+                log.error(String.format("Files for command output \"%s\" were apparently uploaded and saved without error, but no object was returned.", output.getName()));
             }
         }
 
         log.info("Done uploading command outputs.");
     }
 
-    private void uploadOutput(final ContainerExecutionOutput output) throws ContainerException {
+    private XnatModelObject uploadOutput(final ContainerExecutionOutput output) throws ContainerException {
         if (log.isInfoEnabled()) {
             log.info(String.format("Uploading command output \"%s\".", output.getName()));
         }
@@ -207,6 +221,7 @@ public class ContainerFinalizeHelper {
             throw new ContainerException(String.format("Cannot upload output \"%s\". Could not instantiate parent input \"%s\".", output.getName(), output.getParentInputName()));
         }
 
+        XnatModelObject created = null;
         switch (output.getType()) {
             case RESOURCE:
                 if (log.isDebugEnabled()) {
@@ -214,7 +229,9 @@ public class ContainerFinalizeHelper {
                     log.debug(String.format(template, userI.getLogin(), parent.getUri(), label, toUpload));
                 }
                 try {
-                    catalogService.insertResources(userI, "/archive" + parent.getUri(), toUpload, label, null, null, null);
+                    final XnatResourcecatalog resourcecatalog =
+                            catalogService.insertResources(userI, "/archive" + parent.getUri(), toUpload, label, null, null, null);
+                    created = new Resource(resourcecatalog, parent);
                 } catch (Exception e) {
                     throw new ContainerException("Could not upload files to resource.", e);
                 }
@@ -265,6 +282,8 @@ public class ContainerFinalizeHelper {
                  */
                 break;
         }
+
+        return created;
     }
 
     private ContainerExecutionMount getMount(final String mountName) throws ContainerException {

@@ -127,6 +127,7 @@ public class HibernateContainerExecutionService
         }
 
         ContainerFinalizeHelper.finalizeContainer(containerExecution, userI, containerControlApi, siteConfigPreferences, transportService, permissionsService, catalogService, mapper);
+        update(containerExecution);
     }
 
     @Override
