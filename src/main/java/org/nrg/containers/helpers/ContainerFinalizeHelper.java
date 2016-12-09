@@ -53,6 +53,8 @@ public class ContainerFinalizeHelper {
     private Map<String, ContainerExecutionMount> transportedMounts;
     private Map<String, XnatModelObject> inputCache;
 
+    private String prefix;
+
     private ContainerFinalizeHelper(final ContainerExecution containerExecution,
                                     final UserI userI,
                                     final ContainerControlApi containerControlApi,
@@ -74,6 +76,8 @@ public class ContainerFinalizeHelper {
         untransportedMounts = Maps.newHashMap();
         transportedMounts = Maps.newHashMap();
         inputCache = Maps.newHashMap();
+
+        prefix = "Container " + containerExecution.getId() + ": ";
     }
 
     public static void finalizeContainer(final ContainerExecution containerExecution,
@@ -104,7 +108,7 @@ public class ContainerFinalizeHelper {
     }
 
     private void uploadLogs() {
-        log.info("Getting container logs");
+        log.info(prefix + "Getting logs.");
 
         String stdoutLogStr = "";
         String stderrLogStr = "";
@@ -112,7 +116,7 @@ public class ContainerFinalizeHelper {
             stdoutLogStr = containerControlApi.getContainerStdoutLog(containerExecution.getContainerId());
             stderrLogStr = containerControlApi.getContainerStderrLog(containerExecution.getContainerId());
         } catch (DockerServerException | NoServerPrefException e) {
-            log.error("Could not get container logs for container with id " + containerExecution.getContainerId(), e);
+            log.error(prefix + "Could not get logs.", e);
         }
 
         if (StringUtils.isNotBlank(stdoutLogStr) || StringUtils.isNotBlank(stderrLogStr)) {
@@ -126,7 +130,7 @@ public class ContainerFinalizeHelper {
                 final File destination = new File(destinationPath);
                 destination.mkdirs();
 
-                log.info("Saving container logs to " + destinationPath);
+                log.info(prefix + "Saving logs to " + destinationPath);
 
                 if (StringUtils.isNotBlank(stdoutLogStr)) {
                     final File stdoutFile = new File(destination, "stdout.log");
@@ -142,7 +146,7 @@ public class ContainerFinalizeHelper {
     }
 
     private void uploadOutputs() {
-        log.info("Uploading command outputs.");
+        log.info(prefix + "Uploading outputs.");
 
 
         for (final ContainerExecutionOutput output: containerExecution.getOutputs()) {
@@ -156,23 +160,24 @@ public class ContainerFinalizeHelper {
                 try {
                     output.setCreated(mapper.writeValueAsString(created));
                 } catch (JsonProcessingException e) {
-                    String message = String.format("Files for command output \"%s\" were uploaded and saved, but the JSON representation of the object thus created could not be recorded.", output.getName());
-                    if (log.isDebugEnabled()) {
-                        message += "\n" + created;
+                    if (log.isErrorEnabled()) {
+                        String message = prefix;
+                        message += String.format("Files for output \"%s\" were uploaded and saved, but the JSON representation of the object thus created could not be recorded.", output.getName());
+                        if (log.isDebugEnabled()) {
+                            message += "\n" + created;
+                        }
+                        log.error(message, e);
                     }
-                    log.error(message, e);
                 }
-            } else {
-                log.error(String.format("Files for command output \"%s\" were apparently uploaded and saved without error, but no object was returned.", output.getName()));
             }
         }
 
-        log.info("Done uploading command outputs.");
+        log.info(prefix + "Done uploading outputs.");
     }
 
     private XnatModelObject uploadOutput(final ContainerExecutionOutput output) throws ContainerException {
         if (log.isInfoEnabled()) {
-            log.info(String.format("Uploading command output \"%s\".", output.getName()));
+            log.info(String.format(prefix + "Uploading output \"%s\".", output.getName()));
         }
         if (log.isDebugEnabled()) {
             log.debug(output.toString());
@@ -182,15 +187,15 @@ public class ContainerFinalizeHelper {
         final String relativeFilePath = output.getPath() != null ? output.getPath() : "";
         final ContainerExecutionMount mount = getMount(mountName);
         if (mount == null) {
-            throw new ContainerException(String.format("Mount \"%s\" does not exist.", mountName));
+            throw new ContainerException(String.format(prefix + "Mount \"%s\" does not exist.", mountName));
         }
 
         if (log.isDebugEnabled()) {
-            log.debug(String.format("Output files are provided by mount \"%s\": %s", mount.getName(), mount));
+            log.debug(String.format(prefix + "Output files are provided by mount \"%s\": %s", mount.getName(), mount));
         }
 
         if (StringUtils.isBlank(mount.getHostPath())) {
-            throw new ContainerException(String.format("Cannot upload output \"%s\". Mount \"%s\" has blank hostPath.", output.getName(), mount.getName()));
+            throw new ContainerException(String.format(prefix + "Cannot upload output \"%s\". Mount \"%s\" has blank hostPath.", output.getName(), mount.getName()));
         }
 
         final List<File> toUpload;
@@ -199,14 +204,14 @@ public class ContainerFinalizeHelper {
             final File buildDir = new File(mount.getHostPath());
             final File[] buildDirContents = buildDir.listFiles();
             if (buildDirContents == null || buildDirContents.length == 0) {
-                throw new ContainerException(String.format("Nothing to upload for output \"%s\". Mount \"%s\" hostPath has no files.", output.getName(), mount.getName()));
+                throw new ContainerException(String.format(prefix + "Nothing to upload for output \"%s\". Mount \"%s\" hostPath has no files.", output.getName(), mount.getName()));
             }
             toUpload = Arrays.asList(buildDirContents);
         } else {
             final String filePath = FilenameUtils.concat(mount.getHostPath(), relativeFilePath);
             if (StringUtils.isBlank(filePath)) {
                 // This shouldn't happen. We know mount.getHostPath() and relativeFilePath are non-blank
-                throw new ContainerException(String.format("Cannot upload output \"%s\". Mount \"%s\" hostPath + output path is blank.", output.getName(), mount.getName()));
+                throw new ContainerException(String.format(prefix + "Cannot upload output \"%s\". Mount \"%s\" hostPath + output path is blank.", output.getName(), mount.getName()));
             }
 
             toUpload = Lists.newArrayList(new File(filePath));
@@ -218,14 +223,14 @@ public class ContainerFinalizeHelper {
 
         final XnatModelObject parent = getInput(output.getParentInputName());
         if (parent == null) {
-            throw new ContainerException(String.format("Cannot upload output \"%s\". Could not instantiate parent input \"%s\".", output.getName(), output.getParentInputName()));
+            throw new ContainerException(String.format(prefix + "Cannot upload output \"%s\". Could not instantiate parent input \"%s\".", output.getName(), output.getParentInputName()));
         }
 
         XnatModelObject created = null;
         switch (output.getType()) {
             case RESOURCE:
                 if (log.isDebugEnabled()) {
-                    final String template = "Inserting file resource.\n\tuser: %s\n\tparentInputUri: %s\n\tlabel: %s\n\ttoUpload: %s";
+                    final String template = prefix + "Inserting file resource.\n\tuser: %s\n\tparentInputUri: %s\n\tlabel: %s\n\ttoUpload: %s";
                     log.debug(String.format(template, userI.getLogin(), parent.getUri(), label, toUpload));
                 }
                 try {
@@ -233,7 +238,7 @@ public class ContainerFinalizeHelper {
                             catalogService.insertResources(userI, "/archive" + parent.getUri(), toUpload, label, null, null, null);
                     created = new Resource(resourcecatalog, parent);
                 } catch (Exception e) {
-                    throw new ContainerException("Could not upload files to resource.", e);
+                    throw new ContainerException(prefix + "Could not upload files to resource.", e);
                 }
                 break;
             case ASSESSOR:
@@ -283,6 +288,8 @@ public class ContainerFinalizeHelper {
                 break;
         }
 
+
+        log.info(String.format(prefix + "Done uploading output \"%s\".", output.getName()));
         return created;
     }
 
@@ -295,7 +302,7 @@ public class ContainerFinalizeHelper {
         // If mount exists but has not been transported, transport it
         if (untransportedMounts.containsKey(mountName)) {
             if (log.isDebugEnabled()) {
-                log.debug(String.format("Transporting mount \"%s\".", mountName));
+                log.debug(String.format(prefix + "Transporting mount \"%s\".", mountName));
             }
             final ContainerExecutionMount mountToTransport = untransportedMounts.get(mountName);
             final Path pathOnExecutionMachine = Paths.get(mountToTransport.getHostPath());
@@ -305,21 +312,21 @@ public class ContainerFinalizeHelper {
             transportedMounts.put(mountName, mountToTransport);
             untransportedMounts.remove(mountName);
 
-            log.debug("Done transporting mount.");
+            log.debug(prefix + "Done transporting mount.");
             return mountToTransport;
         }
 
         // Mount does not exist
-        throw new ContainerException(String.format("Mount \"%s\" does not exist.", mountName));
+        throw new ContainerException(String.format(prefix + "Mount \"%s\" does not exist.", mountName));
     }
 
     private XnatModelObject getInput(final String inputName) {
         if (log.isDebugEnabled()) {
-            log.debug(String.format("Getting URI for input \"%s\".", inputName));
+            log.debug(String.format(prefix + "Getting URI for input \"%s\".", inputName));
         }
         if (inputCache.containsKey(inputName)) {
             if (log.isDebugEnabled()) {
-                log.debug("Input was cached.");
+                log.debug(prefix + "Input was cached.");
             }
             return inputCache.get(inputName);
         }
@@ -327,7 +334,7 @@ public class ContainerFinalizeHelper {
         final Map<String, String> inputValues = containerExecution.getInputValues();
         if (!inputValues.containsKey(inputName)) {
             if (log.isDebugEnabled()) {
-                log.debug(String.format("No input found with name \"%s\". Input name set: %s", inputName, inputValues.keySet()));
+                log.debug(String.format(prefix + "No input found with name \"%s\". Input name set: %s", inputName, inputValues.keySet()));
             }
             return null;
         }
@@ -336,9 +343,9 @@ public class ContainerFinalizeHelper {
         try {
             final XnatModelObject input = mapper.readValue(inputValue, XnatModelObject.class);
             if (log.isDebugEnabled()) {
-                log.debug(String.format("Caching input \"%s\": %s", inputName, input));
+                log.debug(String.format(prefix + "Caching input \"%s\": %s", inputName, input));
             } else if (log.isInfoEnabled()){
-                log.info(String.format("Caching input \"%s\".", inputName));
+                log.info(String.format(prefix + "Caching input \"%s\".", inputName));
             }
 
             inputCache.put(inputName, input);
@@ -348,9 +355,9 @@ public class ContainerFinalizeHelper {
                 // Yes, I know I checked for "debug" and am logging at "error".
                 // I still want this to show up as "error" either way, but I only want the full object to
                 // be logged if you opted into the firehose.
-                log.error("Could not deserialize Container Execution input value:\n" + inputValue, e);
+                log.error(prefix + "Could not deserialize input value:\n" + inputValue, e);
             } else {
-                log.error("Could not deserialize Container Execution input value.", e);
+                log.error(prefix + "Could not deserialize input value.", e);
             }
         }
 
