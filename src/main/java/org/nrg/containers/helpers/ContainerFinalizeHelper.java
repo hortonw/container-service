@@ -51,7 +51,7 @@ public class ContainerFinalizeHelper {
 
     private Map<String, ContainerExecutionMount> untransportedMounts;
     private Map<String, ContainerExecutionMount> transportedMounts;
-    private Map<String, String> inputUriCache;
+    private Map<String, XnatModelObject> inputCache;
 
     private ContainerFinalizeHelper(final ContainerExecution containerExecution,
                                     final UserI userI,
@@ -73,7 +73,7 @@ public class ContainerFinalizeHelper {
 
         untransportedMounts = Maps.newHashMap();
         transportedMounts = Maps.newHashMap();
-        inputUriCache = Maps.newHashMap();
+        inputCache = Maps.newHashMap();
     }
 
     public static void finalizeContainer(final ContainerExecution containerExecution,
@@ -202,19 +202,19 @@ public class ContainerFinalizeHelper {
                 StringUtils.isNotBlank(mount.getResource()) ? mount.getResource() :
                         mountName;
 
-        final String parentInputUri = getInputUri(output.getParentInputName());
-        if (StringUtils.isBlank(parentInputUri)) {
-            throw new ContainerException(String.format("Cannot upload output \"%s\". Parent \"%s\" URI is blank.", output.getName(), output.getParentInputName()));
+        final XnatModelObject parent = getInput(output.getParentInputName());
+        if (parent == null) {
+            throw new ContainerException(String.format("Cannot upload output \"%s\". Could not instantiate parent input \"%s\".", output.getName(), output.getParentInputName()));
         }
 
         switch (output.getType()) {
             case RESOURCE:
                 if (log.isDebugEnabled()) {
                     final String template = "Inserting file resource.\n\tuser: %s\n\tparentInputUri: %s\n\tlabel: %s\n\ttoUpload: %s";
-                    log.debug(String.format(template, userI.getLogin(), parentInputUri, label, toUpload));
+                    log.debug(String.format(template, userI.getLogin(), parent.getUri(), label, toUpload));
                 }
                 try {
-                    catalogService.insertResources(userI, "/archive" + parentInputUri, toUpload, label, null, null, null);
+                    catalogService.insertResources(userI, "/archive" + parent.getUri(), toUpload, label, null, null, null);
                 } catch (Exception e) {
                     throw new ContainerException("Could not upload files to resource.", e);
                 }
@@ -294,15 +294,15 @@ public class ContainerFinalizeHelper {
         throw new ContainerException(String.format("Mount \"%s\" does not exist.", mountName));
     }
 
-    private String getInputUri(final String inputName) {
+    private XnatModelObject getInput(final String inputName) {
         if (log.isDebugEnabled()) {
             log.debug(String.format("Getting URI for input \"%s\".", inputName));
         }
-        if (inputUriCache.containsKey(inputName)) {
+        if (inputCache.containsKey(inputName)) {
             if (log.isDebugEnabled()) {
-                log.debug("Input URI was cached. Value: " + inputUriCache.get(inputName));
+                log.debug("Input was cached.");
             }
-            return inputUriCache.get(inputName);
+            return inputCache.get(inputName);
         }
 
         final Map<String, String> inputValues = containerExecution.getInputValues();
@@ -313,29 +313,28 @@ public class ContainerFinalizeHelper {
             return null;
         }
 
-        final String parentInputValue = containerExecution.getInputValues().get(inputName);
-        String parentUri = "";
+        final String inputValue = containerExecution.getInputValues().get(inputName);
         try {
-            final XnatModelObject parent = mapper.readValue(parentInputValue, XnatModelObject.class);
+            final XnatModelObject input = mapper.readValue(inputValue, XnatModelObject.class);
             if (log.isDebugEnabled()) {
-                log.debug(String.format("Deserialized input \"%s\": %s", inputName, parent));
+                log.debug(String.format("Caching input \"%s\": %s", inputName, input));
+            } else if (log.isInfoEnabled()){
+                log.info(String.format("Caching input \"%s\".", inputName));
             }
-            parentUri = parent.getUri();
+
+            inputCache.put(inputName, input);
+            return input;
         } catch (IOException e) {
             if (log.isDebugEnabled()) {
                 // Yes, I know I checked for "debug" and am logging at "error".
                 // I still want this to show up as "error" either way, but I only want the full object to
                 // be logged if you opted into the firehose.
-                log.error("Could not deserialize Container Execution input value:\n" + parentInputValue, e);
+                log.error("Could not deserialize Container Execution input value:\n" + inputValue, e);
             } else {
                 log.error("Could not deserialize Container Execution input value.", e);
             }
         }
 
-        if (log.isDebugEnabled()) {
-            log.debug(String.format("Caching URI for input \"%s\": %s", inputName, parentUri));
-        }
-        inputUriCache.put(inputName, parentUri);
-        return parentUri;
+        return null;
     }
 }
