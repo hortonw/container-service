@@ -13,4 +13,4 @@ pandoc -o $HTMLFILE $MDFILE
 
 
 
-awk '/<pre><code>/,/<\/code><\/pre>/ {gsub(/&quot;/, "\""); sub(/<pre><code>/, "<ac:structured-macro ac:name=\"code\"><ac:plain-text-body><![CDATA["); sub(/<\/code><\/pre>/, "]]></ac:plain-text-body></ac:structured-macro>");} {print}' $HTMLFILE > $HTMLFILE.confluence
+awk '/<pre><code>/,/<\/code><\/pre>/ {gsub(/&quot;/, "\""); gsub(/&lt;/, "<"); gsub(/&gt;/, ">"); gsub(/&#39;/, ""); sub(/<pre><code>/, "<ac:structured-macro ac:name=\"code\"><ac:plain-text-body><![CDATA["); sub(/<\/code><\/pre>/, "]]></ac:plain-text-body></ac:structured-macro>");} {print}' $HTMLFILE > $HTMLFILE.confluence
