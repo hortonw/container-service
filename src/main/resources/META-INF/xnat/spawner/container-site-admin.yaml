@@ -1,0 +1,196 @@
+
+####
+#### Container Setup Group
+####
+
+#### Panel content definitions
+pluginSummaryPanel:
+    kind: table.dataTable
+    load: /xapi/plugins/containers
+    items:
+        id: ~data  # '~data' adds this item as a [data-] attribute to each <tr>
+        beanName: ~data.bean
+        name: Plugin Name
+        pluginClass:
+            label: Plugin Class
+        viewPluginInfo:
+            label: Contents
+            value: "-" # this gets overwritten with 'html' below\
+            # function that accepts current item as sole argument and parent object as 'this'
+            # returned value will be new value - if nothing's returned, value is passed through
+            call: (function(){ return formatJSON(this) })
+            html: >
+                <a href="#!" class="view-plugin-info link">View Plugin Info</a>
+                <div data-code-language="json" class="hidden plugin-json-string">__VALUE__</div>
+            td:
+                title: "Plugin JSON"
+            #$: addClass('plugin-info') # this can be a string or object
+            $:
+                addClass: plugin-info
+        messages:
+            noData: >
+                An error occurred looking up information for this plugin
+            error: >
+                An error occurred looking up information for this plugin
+
+pluginTableScript:
+    tag: script|src=/scripts/xnat/admin/pluginManager.js
+
+dockerSetupPanel:
+    kind: panel.form
+    name: dockerSetupPanel
+    label: Docker Server Setup
+    url: /xapi/docker/server
+    contentType: json
+    contents:
+        host:
+            kind: panel.input.text
+            name: host
+            label: Host
+        cert-path:
+            kind: panel.input.text
+            name: cert-path
+            label: Certificate Path
+            description: >
+                The typical Docker server connection does not require a certificate path.
+
+imageHostsPanel:
+    kind: panel.form
+    name: imageHosts
+    label: Image Hosts
+    url: /xapi/docker/hubs
+    contentType: json
+    contents:
+        defaultHost:
+            kind: panel.element
+            name: defaultHost
+            label: Default Image Host
+            html: <strong>https://hub.docker.com</strong>
+        #{imageHostList}
+        addHostCommand:
+            tag: button#add-image-host.btn1|style=margin-top:15px;
+            content: Add Image Host
+
+#### Tab content definitions
+containerPluginInfo:
+    kind: panel
+    name: containerPluginInfo
+    label: Plugin Info
+    contents:
+        {pluginSummaryPanel}
+        {pluginTableScript}
+
+dockerSetup:
+    kind: panel
+    name: dockerSetup
+    label: Docker Server Setup
+    contents:
+        {dockerSetupPanel}
+
+imageHostsSetup:
+    kind: panel
+    name: imageHostsSetup
+    label: Image Hosts
+    contents:
+        {imageHostsPanel}
+
+
+
+####
+#### Image Tab
+####
+
+#### Panel content definitions
+imagesCommandsPanel:
+    kind: panel.form
+    name: imagesCommandsPanel
+    label: Images and Commands in XNAT
+    url: /xapi/commands
+    contentType: json
+    contents:
+        panelText:
+            tag: p
+            content: >
+                This table shows images that have been installed in the XNAT Container Server. New images can be pulled
+                from your specified Image Host. Each image must have one or more commands defined here, so that XNAT
+                actions can be run using that command. <a href="https://wiki.xnat.org/display/CS">Full Documentation</a>
+        addPanel:
+            tag: button#addCommand.btn1|style=margin-top:15px
+            content: Add Command
+
+#### Tab content definitions
+xnatImageCommands:
+    kind: panel
+    name: xnatImageCommands
+    label: Images and Commands
+    contents:
+        {imagesCommandsPanel}
+
+
+
+####
+#### History Tab
+####
+
+#### Panel content definitions
+containerHistoryTable:
+    type: table.dataTable
+    load: /xapi/containers
+        items:
+            command-id: ~data
+            container-id: Container ID
+            created: Launched
+            history.status: Status
+        messages:
+            noData: >
+                <p>No containers have been run on this XNAT</p>
+            error: >
+                <p>There was an error trying to query the container history.</p>
+
+#### Tab content definitions
+containerHistory:
+    kind: panel
+    name: containerHistory
+    label: Container Log
+    contents:
+        {containerHistoryTable}
+
+
+####
+#### containerEventMapping Tab
+####
+
+#### Panel content definitions
+
+#### Tab content definitions
+containerEventMapping:
+    kind: panel
+    name: containerEventMapping
+    label: Container Event Mapping
+
+
+#################################################
+####  Root Site Admin Spawner Config Object  ####
+#################################################
+
+siteSettings:  #This will place the Container Service Admin UI elements from this YAML doc into the "Plugin Settings" Admin page
+    kind: tabs
+    name: containerAdminPage
+    label: Administer Container Service
+    meta:
+        containerServiceTabGroup: Container Service
+    contains: tabs
+    tabs:  # this property name is the same as 'contains', so it will be treated like 'contents'
+        containerServicesTab:
+            kind: tab
+            name: containerSetupTab
+            label: Container Server Setup
+            group: containerSetup
+            active: true
+            contents:
+                ${containerPluginInfo}
+                ${dockerSetup}
+                ${imageHostsSetup}
+                ${xnatImageCommands}
+                ${containerHistory}
+                ${containerEventMapping}
