@@ -116,7 +116,7 @@ Each one of those `{commandN}` things above is a full command definition. The la
     - **command-line-separator** - The character separating the command-line-flag from the value in the command-line. Default: " ".
     - **true-value** - The string to use in the command line for a boolean input when its value is `true`. Some examples: "true", "T", "Y", "1", "--a-flag". Default: "true".
     - **false-value** - The string to use in the command line for a boolean input when its value is `false`. Some examples: "false", "F", "N", "0", "--some-other-flag". Default: "false".
-- **outputs** - A list of outputs that will be used to upload files produced by the container.
+- **outputs** - A liset of outputs that will be used to upload files produced by the container.
     - **name** - The name of the output.
     - **description** - A human-friendly description of the output.
     - **type** - One of "Assessor" or "Resource". Assessor outputs should point to a properly-formatted XML document that holds the details of the assessor object to be created. Resource outputs should point to a file or directory that will be uploaded to a new resource.
@@ -136,11 +136,62 @@ Lots of properties in the Command can use template strings:
 * run.ports - Both the container port and host port can be templates.
 * output.files.path - The relative path within a mount at which output files can be found.
 
-# JSONPath Strings
-More info to come.
+# JSONPath
+JSONPath is an expression syntax for searching through a JSON object, similar to the way you can use XPath to search through an XML document. The syntax and operators are documented here at the source repository: [https://github.com/jayway/JsonPath](https://github.com/jayway/JsonPath/blob/master/README.md).
 
-## JSONPath query strings
-More info to come.
+You can use JSONPath strings as values in several Command fields. When the Command is resolved before it is used to launch a container, those JSONPath strings will be replaced with whatever values they refer to. This is similar to the way you can use a [template string](#template-strings) in the Command definition, which gets replaced by a value when the Command is resolved. In fact, anywhere in the Command that you can use a template string, you can also use a JSONPath expression.
+
+Note: When you use a JSONPath expression as a value, you must surround it with carets (`^...^`) to signal to the Container Service that it needs to invoke the JSONPath interpreter.
+
+JSONPath expressions start at the root of the Command, which is referred to as "`$`".
+
+## JSONPath filters
+The `input.matcher` property uses a special subset of the JSONPath sytax called a "[filter](;https://github.com/jayway/JsonPath/blob/master/README.md#filter-operators)". In JSONPath expressions that can return a list, you can use one of these expressions to filter out non-matching elements. As a simple example, let's say I have the JSON
+
+    {
+        "ice-cream": [
+            {"name": "Strawberry", "flavor": "yummy"},
+            {"name": "Spaghetti", "flavor": "yucky"}
+        ]
+    }
+
+Say I want just the `"name"`s. The JSONPath expression "`$.ice-cream[*].name`" would give back a list:
+
+    ["Strawberry", "Spaghetti"]
+
+But if I filter that list, I can get back just the elements that are `"yummy"`:
+
+    $.ice-cream[?(@.flavor == "yummy")].name
+    ["Strawberry"]
+
+See the [source documentation](https://github.com/jayway/JsonPath/blob/master/README.md#filter-operators) for the filter syntax. The filter is the part inside the parentheses. In the filter expression, we use the character `"@"` to refer to the element that we are checking.
+
+We can use these filter expressions as the value of the `input.matcher`. When the Command is being resolved, a potential input value must not be rejected by the filter, i.e. it must match the filter condition, to be assigned to the input value. In that way, if an input can receive its value from a [parent input](#parent-inputs) which has many children of a certain type, we can select just the one child that we want to be the value for our input.
+
+For example, say we have a Scan input, with a Session input as "parent". That Session may have many child scans, but we can use the `"matcher"` to select one that has a certain scantype by setting it to a filter expression, something like
+
+    @.scan-type in ["T1", "MPRAGE"]
+
+Here's another example from [xnat/dcm2niix-scan](https://github.com/NrgXnat/docker-images/blob/master/dcm2niix-scan/command.json).
+
+    "inputs": [
+        {
+            "name": "scan",
+            "description": "Input scan",
+            "type": "Scan",
+            "required": true,
+            "matcher": "'DICOM' in @.resources[*].label"
+        },
+        {
+            "name": "scan-dicoms",
+            "description": "The scan's dicom resource",
+            "type": "Resource",
+            "parent": "scan",
+            "matcher": "@.label == 'DICOM'"
+        }
+    ]
+
+This Command expects that it will be given a scan as an input, but it wants to run a matcher anyway just to be sure the scan has a DICOM resource (`"matcher": "'DICOM' in @.resources[*].label"`). The second input is a child to the first, and it matches the scan's DICOM resource (`"matcher": "@.label == 'DICOM'"`).
 
 # Input Types
 string, boolean, number, file, Project, Subject, Session, Scan, Assessor, Resource, Config
