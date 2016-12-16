@@ -1,4 +1,4 @@
-# Command
+
 If you want XNAT to execute your docker image, you will need a Command. The Command is a collection of properties that describe your docker image, and which XNAT can read to understand what your image is and how to run it:
 
 * Which docker image is it? What is its ID?
@@ -7,25 +7,8 @@ If you want XNAT to execute your docker image, you will need a Command. The Comm
 * Does it need files? Where should they go? How do you want to get those out of XNAT?
 * Does it produce any files at the end? Those have to get back into XNAT, so where should they go?
 
-## Get your Command into XNAT
-XNAT can read the Command only if it is structured as a JSON object. There are a few ways to get your Command into XNAT:
 
-### UI
-We hope to soon have a web interface for defining / submitting Commands.
-
-### POST  JSON to `/xapi/commands`
-If your docker image already exists on the docker server that XNAT can talk to, you can submit the JSON document to the container-service REST API by POSTing the JSON to `{XNAT}/xapi/commands`.
-
-### Make your docker image "XNAT-ready"
-If you are trying to use a docker image that isn't yours, you will need to define your Command separately from the docker image. But if you control the docker image, you can "bake" one or more Command definitions directly into the image by including it/them as an image label. If you do that, then XNAT can read the Command definitions directly off the image when you first pull it down from Docker Hub or any time later via the REST API.
-
-See the [section on labels in the Dockerfile reference documentation](https://docs.docker.com/engine/reference/builder/#/label) for more information on labeling your images. In short, you can include a label on your image with the key `"org.nrg.commands"`, and with the value being a string representation of a JSON list of Commands. The line in your Dockerfile should look something like this:
-
-        LABEL "org.nrg.commands"="[{command1}, {command2}, ...]"
-
-Each one of those `{commandN}` things above is a full command definition. The label value should be a JSON list (i.e. it should have square brackets `[ ]`) even if you only have one Command definition inside.
-
-## Example command
+# Command object format
 
     {
         "name": "",
@@ -85,7 +68,6 @@ Each one of those `{commandN}` things above is a full command definition. The la
         ]
     }
 
-## JSON parameters
 
 - **name** - The name of the command. The combination of the "name" and "docker-image" values must be unique.
 - **description** - A human-friendly description of the command.
@@ -125,6 +107,16 @@ Each one of those `{commandN}` things above is a full command definition. The la
     - **files** - Where the file(s) can be found inside the container.
         - **mount** - The name of a mount, which must be defined in this command and must have type "output", into which your container wrote whatever file(s) you intend to upload.
         - **path** - The relative path within a mount at which output files can be found. Value can be templatized with input replacement keys.
+
+# Inputs
+Inputs allow you define what information and objects need to be provided when your Command is resolved before the container is launched. They are the way for you to gather all the requirements you need to launch your container: files, command-line arguments, environment variables, etc. Absolutely anything that you need for your container has to either be an input value or, if the input is one of the XNAT object types and the value is a big complex object, be some property or child of an input value.
+
+## Input Types
+string, boolean, number, file, Project, Subject, Session, Scan, Assessor, Resource, Config
+More info to come.
+
+## Parent Inputs
+More info to come.
 
 # Template Strings
 When you define a Command, you can leave many of the values as "templates". These templates are placeholder strings, also known as "replacement keys", which tell the container service "When you launch a container from this Command, you will have values for your inputs; I want you to use one of those values here."
@@ -192,12 +184,6 @@ Here's another example from [xnat/dcm2niix-scan](https://github.com/NrgXnat/dock
     ]
 
 This Command expects that it will be given a scan as an input, but it wants to run a matcher anyway just to be sure the scan has a DICOM resource (`"matcher": "'DICOM' in @.resources[*].label"`). The second input is a child to the first, and it matches the scan's DICOM resource (`"matcher": "@.label == 'DICOM'"`).
-
-# Input Types
-string, boolean, number, file, Project, Subject, Session, Scan, Assessor, Resource, Config
-
-# Parent Inputs
-More info to come.
 
 # Examples
 ## Hello world example
